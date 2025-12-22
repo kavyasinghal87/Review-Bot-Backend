@@ -40,6 +40,10 @@ async def optimize_code(request: CodeRequest):
     except Exception as e:
         return {"error": str(e)}
 
+import os
+
 if __name__ == "__main__":
-    # Use 127.0.0.1 for more stability on Windows
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # Get the port from Render's environment, default to 10000 for local testing
+    port = int(os.environ.get("PORT", 10000))
+    # Bind to 0.0.0.0 so the public internet can reach it
+    uvicorn.run(app, host="0.0.0.0", port=port)
