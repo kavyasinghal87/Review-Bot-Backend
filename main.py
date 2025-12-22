@@ -4,9 +4,16 @@ from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
+from dotenv import load_dotenv  # Added this to load variables
 
-# 1. Setup
-os.environ["GOOGLE_API_KEY"] = "AIzaSyD0NhN9QLY97cxQhnTE6JLtVfmGGfQ67Uo"
+# 1. Setup - Secure Loading
+load_dotenv()  # This reads the key from your .env file
+os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY") 
+
+# Check if key is loaded (for debugging)
+if not os.environ.get("GOOGLE_API_KEY"):
+    print("⚠️ ERROR: No API Key found. Check your .env file!")
+
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
 
 class AuditReport(BaseModel):
