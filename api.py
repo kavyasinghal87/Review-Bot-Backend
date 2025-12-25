@@ -4,7 +4,9 @@ from pydantic import BaseModel
 import uvicorn
 import sys
 import os
-import sqlite3
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Try to import your logic
 try:
@@ -23,16 +25,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Database Setup ---
-def init_db():
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS visitors 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT)''')
-    conn.commit()
-    conn.close()
+# --- Email Configuration ---
+# Tip: It's better to put these in Render Environment Variables later
+GMAIL_USER = "your_email@gmail.com"  # Your Gmail address
+GMAIL_APP_PASS = "your_16_char_app_password"  # The 16-character code from Google
+RECEIVER_EMAIL = "your_email@gmail.com"  # Where you want to receive the alerts
 
-init_db()
+def send_visitor_email(name, email):
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = GMAIL_USER
+        msg['To'] = RECEIVER_EMAIL
+        msg['Subject'] = f"🚀 New ReviewBot Visitor: {name}"
+
+        body = f"A user has logged into ReviewBot AI.\n\nDetails:\nName: {name}\nEmail: {email}"
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Standard Gmail SMTP settings
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(GMAIL_USER, GMAIL_APP_PASS)
+        server.sendmail(GMAIL_USER, RECEIVER_EMAIL, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
 
 class LoginRequest(BaseModel):
     name: str
@@ -41,19 +59,18 @@ class LoginRequest(BaseModel):
 class CodeRequest(BaseModel):
     code: str
 
-# --- New Registration Endpoint ---
+# --- Updated Registration Endpoint ---
 @app.post("/register")
 async def register_visitor(request: LoginRequest):
-    try:
-        conn = sqlite3.connect('users.db')
-        c = conn.cursor()
-        c.execute("INSERT INTO visitors (name, email) VALUES (?, ?)", 
-                  (request.name, request.email))
-        conn.commit()
-        conn.close()
+    # This sends the email to you immediately
+    email_sent = send_visitor_email(request.name, request.email)
+    
+    if email_sent:
         return {"status": "SUCCESS"}
-    except Exception as e:
-        return {"status": "ERROR", "message": str(e)}
+    else:
+        # We return SUCCESS so the user can still enter, but log the error on the server
+        print("ALERT: Visitor logged in but email notification failed.")
+        return {"status": "SUCCESS"}
 
 @app.post("/audit")
 async def audit_code(request: CodeRequest):
