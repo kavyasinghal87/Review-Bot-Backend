@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import sys
+import os
+import sqlite3
 
 # Try to import your logic
 try:
@@ -21,8 +23,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Database Setup ---
+def init_db():
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS visitors 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT)''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+class LoginRequest(BaseModel):
+    name: str
+    email: str
+
 class CodeRequest(BaseModel):
     code: str
+
+# --- New Registration Endpoint ---
+@app.post("/register")
+async def register_visitor(request: LoginRequest):
+    try:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO visitors (name, email) VALUES (?, ?)", 
+                  (request.name, request.email))
+        conn.commit()
+        conn.close()
+        return {"status": "SUCCESS"}
+    except Exception as e:
+        return {"status": "ERROR", "message": str(e)}
 
 @app.post("/audit")
 async def audit_code(request: CodeRequest):
@@ -40,10 +71,7 @@ async def optimize_code(request: CodeRequest):
     except Exception as e:
         return {"error": str(e)}
 
-import os
-
 if __name__ == "__main__":
-    # Get the port from Render's environment, default to 10000 for local testing
     port = int(os.environ.get("PORT", 10000))
-    # Bind to 0.0.0.0 so the public internet can reach it
+    # Bind to 0.0.0.0 for Render production
     uvicorn.run(app, host="0.0.0.0", port=port)
